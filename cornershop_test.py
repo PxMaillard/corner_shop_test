@@ -68,6 +68,9 @@ def analisisExploratorio():
     print(data.isnull().sum())
     
     
+    # replace data with median values 
+    
+    
     data['accepted_rate'].fillna(data['accepted_rate'].median(skipna=True), inplace=True)
     
     data['rating'].fillna(data['rating'].median(skipna=True), inplace=True)
@@ -79,15 +82,29 @@ def analisisExploratorio():
     
     print(data.isnull().sum())
     
+    print("order_id")
+    print(data['order_id'])
+    
+    
+ 
+    
     
     del data['store_id']
     
-    del data['order_id']
+#    del data['order_id']
+#    
+    
+    
+    # clean data in case there are time values under 0
 
 
     data.loc[data['total_minutes']<0, ['total_minutes']] = np.nan 
     
-    data.loc[data['total_minutes']>300, ['total_minutes']] = np.nan 
+#    data.loc[data['total_minutes']>300, ['total_minutes']] = np.nan 
+    
+    
+    # delete values wwhere are not total_time values
+
     
     data = data.dropna(axis=0, how='any')
     
@@ -103,7 +120,8 @@ def analisisExploratorio():
  
 
         
-    # convert lat and lng into distances
+    # convert lat and lng into distances so it is possible to calculate the distance between delivery and order
+    
     
     def haversine_vectorize(lon1, lat1, lon2, lat2):
         
@@ -128,7 +146,7 @@ def analisisExploratorio():
         data["lat_order"]) 
     
     
-    # create new dataset with distance included
+    # create new dataset with distance included and delete distnaces in case are negative
     
     
     data.loc[ data['distance_km']<0,['distance_km']] = np.nan
@@ -147,7 +165,8 @@ def analisisExploratorio():
     
     #webbrowser.open('mymap.html', new=2)  # open in new tab
     
-    # transform to categorical 
+    
+    # transform to categorical  so seniority can be classified
     
         
     data['seniority'] = data['seniority'].astype('category')
@@ -162,13 +181,18 @@ def analisisExploratorio():
 #    data=pd.get_dummies(data,columns=['seniority'],drop_first =False)
     
     
+    
     data['shopper_id'] = data['shopper_id'].astype('category')
     
     data['shopper_id'] = data['shopper_id'].cat.codes
     
+    
     data['store_branch_id'] = data['store_branch_id'].astype('category')
     
     data['store_branch_id'] = data['store_branch_id'].cat.codes
+    
+    
+    # plot to visualize data
     
     
     plt.figure()
@@ -210,6 +234,7 @@ def analisisExploratorio():
     
     plt.show()
     
+    
     # change data time type to ns[64]
     
     
@@ -218,20 +243,21 @@ def analisisExploratorio():
     data['promised_time'] = pd.to_datetime(data['promised_time'], format="%H:%M:%S").dt.tz_localize(None)
     
     
-    # bin time to catogories
+    # bin time to catogories to split with period of the day in 4 time zones
     
     
-    bins1 = [0, 8, 16, 24]
+    #bins1 = [0, 8, 16, 24]
     
-    labels1 = ['24hr - 08hr', '08hr - 16hr', '16hr -24hr']
+    #labels1 = ['24hr - 08hr', '08hr - 16hr', '16hr -24hr']
     
     bins2 = [0, 6, 12, 18, 24]
     
     labels2 = ['24hr - 06hr', '06hr - 12hr', '12hr -18hr', '18hr-24hr']
     
-    bins3 = [0, 12, 24]
+    #bins3 = [0, 12, 24]
     
-    labels3 = ['24hr - 12hr', '12hr - 24hr']
+    #labels3 = ['24hr - 12hr', '12hr - 24hr']
+    
     
     res = pd.cut(data['promised_time'].dt.hour, bins2, labels = labels2, right=False)
     
@@ -268,7 +294,7 @@ def analisisExploratorio():
     plt.grid()
     
     
-    # classify coordinates in groups
+    # classify coordinates in groups, separte santiago in 4 areas to avoid overdimentionality
     
     
     cut_points1 = data['lat_order'].quantile([0,0.25,0.5,0.75,1.0])
@@ -279,6 +305,7 @@ def analisisExploratorio():
     labels1= [0, 1, 2, 3]
     
     labels2= [0, 1, 2, 3]
+
 
 
     data['lat_order_b'] = pd.cut(data['lat_order'], bins=cut_points1, labels=labels1, include_lowest=True) 
@@ -301,6 +328,7 @@ def analisisExploratorio():
 #    data=pd.get_dummies(data,columns=['lng_store_b'],drop_first =False)
     
     
+    
 
     plt.figure()
     
@@ -314,7 +342,7 @@ def analisisExploratorio():
     
     plt.show()
     
-   
+   # calculate the time to get all products
     
     data['time_per_products'] = data['picking_speed']*data['productosdistintos']
     
@@ -382,7 +410,16 @@ def analisisExploratorio():
     # split data and make correlations matrix
     
     
+    order_id = data['order_id']
+    
+    
+    data= data.drop('order_id', axis=1)
+    
     x = data.drop('total_minutes', axis=1)
+
+    
+#    print("----- infoooo---- ")
+#    print(x.info())
     
     y = data['total_minutes']
     
@@ -398,6 +435,8 @@ def analisisExploratorio():
    
     
     # see more important coeffecients
+    
+
     
     
     x_new = f_regression(x, y, center=True)
@@ -415,11 +454,8 @@ def analisisExploratorio():
     print(kBest)
     
 
-    return data
+    return data , order_id 
 
-
-
-#DatosProcesados = analisisExploratorio()
 
 
 
@@ -438,14 +474,13 @@ def NeuralRegression():
     selected_features = ['picking_speed', 
                          'productosdistintos', 
                          'UNIDADES', 
-                         'KG', 
-                         'distance_km',
+                         'KG',
                          'rating',
                          'distance_km', 
                          'seniority_0', 
                          'seniority_1', 
                          'seniority_2', 
-                         'seniority_3']
+                         'seniority_3','','','']
     
     
     xdata = x  #data[selected_features]
@@ -538,7 +573,7 @@ def NeuralRegression():
     return nn
 
 
-#NN_preds = NeuralRegression()
+
 
 
 def RegressionModels():
@@ -569,6 +604,7 @@ def RegressionModels():
   
             
     Xdata  = DatosProcesados.drop('total_minutes', axis = 1)
+#    Xdata  = DatosProcesados.drop('order_id', axis = 1)
     
     Ydata =  DatosProcesados['total_minutes']
     
@@ -593,7 +629,7 @@ def RegressionModels():
     Tiempos = np.array(Ydata)
     
     
-    # regresion lineal
+    # regresion lineal Regression
     
     
     linear_regression = LinearRegression()
@@ -616,7 +652,7 @@ def RegressionModels():
     lin_mre = np.sqrt(-lin_scores)
 
     
-    # decision tree
+    # decision tree Regressor
     
     
     tree_reg = DecisionTreeRegressor(max_depth=8)
@@ -640,7 +676,7 @@ def RegressionModels():
     tree_mre = np.sqrt(-tree_scores)
     
     
-    # Random Forest
+    # Random Forest Regressor 
     
 
     Random_reg = RandomForestRegressor(random_state=10)
@@ -705,32 +741,36 @@ def RegressionModels():
 
 
 
-# call all functions
+
+
+
+
+if __name__ == '__main__':
     
 
-DatosProcesados = analisisExploratorio()
-NN_preds = NeuralRegression()
-final_predictions_regressions = RegressionModels()
+    DatosProcesados = analisisExploratorio()[0]
+    orders_id = analisisExploratorio()[1]
+    NN_preds = NeuralRegression()
+    final_predictions_regressions = RegressionModels()
+#    
+    
+    All_preds = (np.vstack([orders_id,
+                            final_predictions_regressions[0], 
+                            final_predictions_regressions[1], 
+                            final_predictions_regressions[2],
+                            final_predictions_regressions[3],
+                            NN_preds[:,1]])).T
+        
+    df_preds = pd.DataFrame(data=All_preds, columns=['order_id'
+                                                     ,'total_time', 
+                                                     "linear_preds", 
+                                                     "decisionTree_preds", 
+                                                     "RandonForest_preds",
+                                                     'NN_preds'])
+        
+#    df_preds.to_csv('All_predicions.csv',index=False)
+#    
+    print("")
+#    
+    print("predictions saved in file 'All_predictions' ")
 
-
-
-# set all the data n one finall file
-
-
-All_preds = (np.vstack([final_predictions_regressions[0], 
-                        final_predictions_regressions[1], 
-                        final_predictions_regressions[2],
-                        final_predictions_regressions[3],
-                        NN_preds[:,1]])).T
-
-
-df_preds = pd.DataFrame(data=All_preds, columns=['real_delivery_time', 
-                                                 "linear_preds", 
-                                                 "decisionTree_preds", 
-                                                 "RandonForest_preds",'NN_preds'])
-
-
-
-df_preds.to_csv('All_predicions.csv',index=False)
-
-print("predictions saved in file ' All_predictions '")
